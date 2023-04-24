@@ -1,0 +1,7 @@
+.debugger
+.deps
+artifacts
+.prettierrc.json
+
+#encryption contract
+crypto.sol
