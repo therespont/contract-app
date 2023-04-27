@@ -60,48 +60,7 @@ contract User {
         ContractInfo.Signature = GenerateSignature(true);
     }
 
-    function GenerateSignature(bool _IsGlobal) private view returns (bytes32) {
-        bytes32 key;
-        assembly {
-            key := mload(0x40)
-            mstore(0x40, add(key, 32))
-        }
-        uint256 random;
-        if (_IsGlobal)
-            random = uint256(
-                keccak256(
-                    abi.encodePacked(
-                        msg.data,
-                        string.concat(
-                            Strings.toString(block.gaslimit),
-                            Strings.toHexString(block.number)
-                        ),
-                        string.concat(
-                            Strings.toString(block.gaslimit),
-                            Strings.toHexString(msg.sender),
-                            Strings.toHexString(block.coinbase)
-                        )
-                    )
-                )
-            );
-        else
-            random = uint256(
-                keccak256(
-                    abi.encodePacked(
-                        ContractInfo.Signature,
-                        key,
-                        string.concat(
-                            Strings.toString(block.timestamp),
-                            Strings.toString(gasleft()),
-                            Strings.toHexString(msg.sender),
-                            Strings.toString(block.number)
-                        )
-                    )
-                )
-            );
-
-        return bytes32(random);
-    }
+    //Generate the signature
 
     function CreateProfile(address _Owner) public {
         require(
