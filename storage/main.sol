@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-import "@openzeppelin/contracts/utils/Strings.sol";
-import {Cryptography} from "./crypto.sol";
-
-contract User {
+contract Main {
     struct Contract {
-        bytes32 Signature;
         address Creator;
     }
 
@@ -15,10 +11,11 @@ contract User {
     struct MessageStruct {
         address FromAddress;
         address ToAddress;
-        string MessageText;
-        string[] MediaLink;
+        bytes MessageText;
+        bytes MediaLink;
         uint256 MessageTimestamp;
         uint256 BlockHeight;
+        address KeyLocation;
     }
 
     struct OpponentStruct {
@@ -27,7 +24,6 @@ contract User {
     }
 
     struct ProfileStruct {
-        bytes32 Signature;
         string Picture;
         address[] Opponents;
         address[] BlockList;
@@ -47,38 +43,31 @@ contract User {
 
     mapping(address => mapping(address => MessageStruct[])) private Messages;
     mapping(address => ProfileStruct) private Profile;
+    mapping(address => bool) private Profiles;
     mapping(address => mapping(address => bool)) private BlockList;
 
     constructor() {
-        ContractInfo.Signature = GenerateSignature(true);
         ContractInfo.Creator = msg.sender;
     }
 
-    function RegenerateSignature() public {
-        require(msg.sender == ContractInfo.Creator);
-
-        ContractInfo.Signature = GenerateSignature(true);
-    }
-
-    //Generate the signature
-
-    function CreateProfile(address _Owner) public {
+    function CreateProfile(address _Owner) private {
         require(
-            Profile[_Owner].Signature == bytes32(0),
+            !Profiles[_Owner],
             "Address already has profile"
         );
 
         Profile[_Owner] = ProfileStruct(
-            GenerateSignature(false),
             "",
             Profile[_Owner].Opponents,
             Profile[_Owner].BlockList
         );
+
+        Profiles[_Owner] = true;
     }
 
     function ChangePicture(string memory _MediaLink) public {
         require(
-            Profile[msg.sender].Signature != bytes32(0),
+            !Profiles[msg.sender],
             "You never interact with the contract"
         );
 
@@ -91,23 +80,6 @@ contract User {
         return Profile[_Opponent].Picture;
     }
 
-    function GetSignature() private view returns (bytes32) {
-        bytes32 Signature = ContractInfo.Signature;
-
-        if (Profile[msg.sender].Signature != bytes32(0))
-            Signature = Profile[msg.sender].Signature;
-
-        return Signature;
-    }
-
-    function GenerateText(string memory _Text)
-        public
-        view
-        returns (bytes memory)
-    {
-        return Cryptography.encrypt(_Text, GetSignature());
-    }
-
     function GetBlockList() public view returns (address[] memory) {
         return Profile[msg.sender].BlockList;
     }
@@ -115,7 +87,7 @@ contract User {
     function AddBlockList(address _Opponent) public {
         require(msg.sender != _Opponent, "Can not block own address");
         require(
-            Profile[msg.sender].Signature != bytes32(0),
+            !Profiles[msg.sender],
             "You never interact with the contract"
         );
         require(!BlockList[msg.sender][_Opponent], "Address already blocked");
@@ -132,7 +104,7 @@ contract User {
         returns (address[] memory)
     {
         require(
-            Profile[msg.sender].Signature != bytes32(0),
+            !Profiles[msg.sender],
             "You never interact with the contract"
         );
         require(!BlockList[msg.sender][_Opponent], "Address is not blocked");
@@ -153,7 +125,7 @@ contract User {
 
     function RemoveBlockList(address _Opponent) public {
         require(
-            Profile[msg.sender].Signature != bytes32(0),
+            !Profiles[msg.sender],
             "You never interact with the contract"
         );
         require(BlockList[msg.sender][_Opponent], "Address is not blocked");
@@ -197,7 +169,8 @@ contract User {
     function SendMessage(
         address _ToAddress,
         bytes memory _MessageText,
-        string[] memory _MediaLink
+        bytes memory _MediaLink,
+        address _KeyLocation
     ) public {
         require(msg.sender != _ToAddress, "Can not send message to yourself");
         require(
@@ -205,9 +178,9 @@ contract User {
             "Opponent address is blocked by you"
         );
 
-        string memory MessageText = Decrypt(_MessageText, GetSignature());
+        require(bytes(_MessageText).length > 0, "Invalid message!");
 
-        if (Profile[msg.sender].Signature == bytes32(0))
+        if (!Profiles[msg.sender])
             CreateProfile(msg.sender);
 
         if (Messages[msg.sender][_ToAddress].length <= 0)
@@ -217,17 +190,16 @@ contract User {
             MessageStruct(
                 msg.sender,
                 _ToAddress,
-                MessageText,
+                _MessageText,
                 _MediaLink,
                 block.timestamp,
-                block.number
+                block.number,
+                _KeyLocation
             )
         );
 
-        Profile[msg.sender].Signature = GenerateSignature(false);
-
         if (!BlockList[_ToAddress][msg.sender]) {
-            if (Profile[_ToAddress].Signature == bytes32(0))
+            if (!Profiles[_ToAddress])
                 CreateProfile(_ToAddress);
 
             if (Messages[_ToAddress][msg.sender].length <= 0)
@@ -237,18 +209,15 @@ contract User {
                 MessageStruct(
                     msg.sender,
                     _ToAddress,
-                    MessageText,
+                    _MessageText,
                     _MediaLink,
                     block.timestamp,
-                    block.number
+                    block.number,
+                    _KeyLocation
                 )
             );
-
-            Profile[_ToAddress].Signature = GenerateSignature(false);
         }
 
         emit Sent(msg.sender, _ToAddress);
     }
-
-    // Decrypt function
 }
