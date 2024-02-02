@@ -51,10 +51,7 @@ contract Main {
     }
 
     function CreateProfile(address _Owner) private {
-        require(
-            !Profiles[_Owner],
-            "Address already has profile"
-        );
+        require(!Profiles[_Owner], "Address already has profile");
 
         Profile[_Owner] = ProfileStruct(
             "",
@@ -66,10 +63,7 @@ contract Main {
     }
 
     function ChangePicture(string memory _MediaLink) public {
-        require(
-            !Profiles[msg.sender],
-            "You never interact with the contract"
-        );
+        require(Profiles[msg.sender], "You never interact with the contract");
 
         Profile[msg.sender].Picture = _MediaLink;
 
@@ -86,10 +80,7 @@ contract Main {
 
     function AddBlockList(address _Opponent) public {
         require(msg.sender != _Opponent, "Can not block own address");
-        require(
-            !Profiles[msg.sender],
-            "You never interact with the contract"
-        );
+        require(Profiles[msg.sender], "You never interact with the contract");
         require(!BlockList[msg.sender][_Opponent], "Address already blocked");
 
         BlockList[msg.sender][_Opponent] = true;
@@ -103,10 +94,7 @@ contract Main {
         view
         returns (address[] memory)
     {
-        require(
-            !Profiles[msg.sender],
-            "You never interact with the contract"
-        );
+        require(Profiles[msg.sender], "You never interact with the contract");
         require(!BlockList[msg.sender][_Opponent], "Address is not blocked");
 
         address[] memory Blocked = new address[](
@@ -124,10 +112,7 @@ contract Main {
     }
 
     function RemoveBlockList(address _Opponent) public {
-        require(
-            !Profiles[msg.sender],
-            "You never interact with the contract"
-        );
+        require(Profiles[msg.sender], "You never interact with the contract");
         require(BlockList[msg.sender][_Opponent], "Address is not blocked");
 
         BlockList[msg.sender][_Opponent] = false;
@@ -136,34 +121,105 @@ contract Main {
         emit BlockListRemoved(msg.sender, _Opponent);
     }
 
-    function Opponents() public view returns (OpponentStruct[] memory) {
-        OpponentStruct[] memory OpponentList = new OpponentStruct[](
-            Profile[msg.sender].Opponents.length
-        );
+    function Opponents(uint256 _BeforeHeight, uint256 _Limit)
+        public
+        view
+        returns (OpponentStruct[] memory)
+    {
+        OpponentStruct[] memory OpponentList = new OpponentStruct[](_Limit);
+        uint256 OpponentListLength = 0;
 
-        for (uint256 i = 0; i < Profile[msg.sender].Opponents.length; i++) {
-            uint256 MessageLength = Messages[msg.sender][
-                Profile[msg.sender].Opponents[i]
-            ].length;
-            OpponentList[i] = OpponentStruct(
-                Profile[msg.sender].Opponents[i],
+        for (
+            uint256 i = Profile[msg.sender].Opponents.length - 1;
+            i >= 0;
+            i--
+        ) {
+            if (
+                _BeforeHeight > 0 &&
                 Messages[msg.sender][Profile[msg.sender].Opponents[i]][
-                    MessageLength - 1
-                ]
-            );
+                    Messages[msg.sender][Profile[msg.sender].Opponents[i]]
+                        .length - 1
+                ].BlockHeight <=
+                _BeforeHeight
+            ) {
+                OpponentList[OpponentListLength] = OpponentStruct(
+                    Profile[msg.sender].Opponents[i],
+                    Messages[msg.sender][Profile[msg.sender].Opponents[i]][
+                        Messages[msg.sender][Profile[msg.sender].Opponents[i]]
+                            .length - 1
+                    ]
+                );
+
+                OpponentListLength += 1;
+            } else if (_BeforeHeight == 0 && OpponentListLength < _Limit) {
+                OpponentList[OpponentListLength] = OpponentStruct(
+                    Profile[msg.sender].Opponents[i],
+                    Messages[msg.sender][Profile[msg.sender].Opponents[i]][
+                        Messages[msg.sender][Profile[msg.sender].Opponents[i]]
+                            .length - 1
+                    ]
+                );
+
+                OpponentListLength += 1;
+            }
+
+            if (i == 0) break;
         }
 
         return OpponentList;
     }
 
-    function Message(address _Opponent)
+    function AMessage(address _Opponent)
         public
         view
-        returns (MessageStruct[] memory)
+        returns (MessageStruct memory)
     {
         require(msg.sender != _Opponent, "Can not get own message");
 
-        return Messages[msg.sender][_Opponent];
+        return
+            Messages[msg.sender][_Opponent][
+                Messages[msg.sender][_Opponent].length - 1
+            ];
+    }
+
+    function Message(
+        address _Opponent,
+        uint256 _BeforeHeight,
+        uint256 _Limit
+    ) public view returns (MessageStruct[] memory) {
+        require(msg.sender != _Opponent, "Can not get own message");
+
+        MessageStruct[] memory MessageList = new MessageStruct[](_Limit);
+        uint256 MessageListLength = 0;
+
+        for (
+            uint256 i = Messages[msg.sender][_Opponent].length - 1;
+            i >= 0;
+            i--
+        ) {
+            if (
+                _BeforeHeight > 0 &&
+                Messages[msg.sender][_Opponent][i].BlockHeight <=
+                _BeforeHeight &&
+                MessageListLength < _Limit
+            ) {
+                MessageList[MessageListLength] = Messages[msg.sender][
+                    _Opponent
+                ][i];
+
+                MessageListLength += 1;
+            } else if (_BeforeHeight == 0 && MessageListLength < _Limit) {
+                MessageList[MessageListLength] = Messages[msg.sender][
+                    _Opponent
+                ][i];
+
+                MessageListLength += 1;
+            }
+
+            if (i == 0) break;
+        }
+
+        return MessageList;
     }
 
     function SendMessage(
@@ -173,15 +229,10 @@ contract Main {
         address _KeyLocation
     ) public {
         require(msg.sender != _ToAddress, "Can not send message to yourself");
-        require(
-            !BlockList[msg.sender][_ToAddress],
-            "Opponent address is blocked by you"
-        );
 
         require(bytes(_MessageText).length > 0, "Invalid message!");
 
-        if (!Profiles[msg.sender])
-            CreateProfile(msg.sender);
+        if (!Profiles[msg.sender]) CreateProfile(msg.sender);
 
         if (Messages[msg.sender][_ToAddress].length <= 0)
             Profile[msg.sender].Opponents.push(_ToAddress);
@@ -199,8 +250,7 @@ contract Main {
         );
 
         if (!BlockList[_ToAddress][msg.sender]) {
-            if (!Profiles[_ToAddress])
-                CreateProfile(_ToAddress);
+            if (!Profiles[_ToAddress]) CreateProfile(_ToAddress);
 
             if (Messages[_ToAddress][msg.sender].length <= 0)
                 Profile[_ToAddress].Opponents.push(msg.sender);
