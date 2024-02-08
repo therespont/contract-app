@@ -129,42 +129,45 @@ contract Main {
         OpponentStruct[] memory OpponentList = new OpponentStruct[](_Limit);
         uint256 OpponentListLength = 0;
 
-        for (
-            uint256 i = Profile[msg.sender].Opponents.length - 1;
-            i >= 0;
-            i--
-        ) {
-            if (
-                _BeforeHeight > 0 &&
-                Messages[msg.sender][Profile[msg.sender].Opponents[i]][
-                    Messages[msg.sender][Profile[msg.sender].Opponents[i]]
-                        .length - 1
-                ].BlockHeight <=
-                _BeforeHeight
+        if (Profile[msg.sender].Opponents.length > 0)
+            for (
+                uint256 i = Profile[msg.sender].Opponents.length - 1;
+                i >= 0;
+                i--
             ) {
-                OpponentList[OpponentListLength] = OpponentStruct(
-                    Profile[msg.sender].Opponents[i],
+                if (
+                    _BeforeHeight > 0 &&
                     Messages[msg.sender][Profile[msg.sender].Opponents[i]][
                         Messages[msg.sender][Profile[msg.sender].Opponents[i]]
                             .length - 1
-                    ]
-                );
+                    ].BlockHeight <=
+                    _BeforeHeight
+                ) {
+                    OpponentList[OpponentListLength] = OpponentStruct(
+                        Profile[msg.sender].Opponents[i],
+                        Messages[msg.sender][Profile[msg.sender].Opponents[i]][
+                            Messages[msg.sender][
+                                Profile[msg.sender].Opponents[i]
+                            ].length - 1
+                        ]
+                    );
 
-                OpponentListLength += 1;
-            } else if (_BeforeHeight == 0 && OpponentListLength < _Limit) {
-                OpponentList[OpponentListLength] = OpponentStruct(
-                    Profile[msg.sender].Opponents[i],
-                    Messages[msg.sender][Profile[msg.sender].Opponents[i]][
-                        Messages[msg.sender][Profile[msg.sender].Opponents[i]]
-                            .length - 1
-                    ]
-                );
+                    OpponentListLength += 1;
+                } else if (_BeforeHeight == 0 && OpponentListLength < _Limit) {
+                    OpponentList[OpponentListLength] = OpponentStruct(
+                        Profile[msg.sender].Opponents[i],
+                        Messages[msg.sender][Profile[msg.sender].Opponents[i]][
+                            Messages[msg.sender][
+                                Profile[msg.sender].Opponents[i]
+                            ].length - 1
+                        ]
+                    );
 
-                OpponentListLength += 1;
+                    OpponentListLength += 1;
+                }
+
+                if (i == 0) break;
             }
-
-            if (i == 0) break;
-        }
 
         return OpponentList;
     }
@@ -192,32 +195,33 @@ contract Main {
         MessageStruct[] memory MessageList = new MessageStruct[](_Limit);
         uint256 MessageListLength = 0;
 
-        for (
-            uint256 i = Messages[msg.sender][_Opponent].length - 1;
-            i >= 0;
-            i--
-        ) {
-            if (
-                _BeforeHeight > 0 &&
-                Messages[msg.sender][_Opponent][i].BlockHeight <=
-                _BeforeHeight &&
-                MessageListLength < _Limit
+        if (Messages[msg.sender][_Opponent].length > 0)
+            for (
+                uint256 i = Messages[msg.sender][_Opponent].length - 1;
+                i >= 0;
+                i--
             ) {
-                MessageList[MessageListLength] = Messages[msg.sender][
-                    _Opponent
-                ][i];
+                if (
+                    _BeforeHeight > 0 &&
+                    Messages[msg.sender][_Opponent][i].BlockHeight <=
+                    _BeforeHeight &&
+                    MessageListLength < _Limit
+                ) {
+                    MessageList[MessageListLength] = Messages[msg.sender][
+                        _Opponent
+                    ][i];
 
-                MessageListLength += 1;
-            } else if (_BeforeHeight == 0 && MessageListLength < _Limit) {
-                MessageList[MessageListLength] = Messages[msg.sender][
-                    _Opponent
-                ][i];
+                    MessageListLength += 1;
+                } else if (_BeforeHeight == 0 && MessageListLength < _Limit) {
+                    MessageList[MessageListLength] = Messages[msg.sender][
+                        _Opponent
+                    ][i];
 
-                MessageListLength += 1;
+                    MessageListLength += 1;
+                }
+
+                if (i == 0) break;
             }
-
-            if (i == 0) break;
-        }
 
         return MessageList;
     }
