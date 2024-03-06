@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-contract Main {
-    struct Contract {
-        address Creator;
-    }
+import "@opengsn/contracts/src/ERC2771Recipient.sol";
 
-    Contract private ContractInfo;
-
+contract Main is ERC2771Recipient {
     struct MessageStruct {
         address FromAddress;
         address ToAddress;
@@ -41,13 +37,27 @@ contract Main {
         address indexed _BlockedAddress
     );
 
+    address private contractOwner;
     mapping(address => mapping(address => MessageStruct[])) private Messages;
     mapping(address => ProfileStruct) private Profile;
     mapping(address => bool) private Profiles;
     mapping(address => mapping(address => bool)) private BlockList;
 
-    constructor() {
-        ContractInfo.Creator = msg.sender;
+    constructor(address _trustedForwarder) {
+        contractOwner = msg.sender;
+        _setTrustedForwarder(_trustedForwarder);
+    }
+
+    function getTrustedForwarder() override public view returns (address){
+        require(msg.sender == contractOwner);
+
+        return super.getTrustedForwarder();
+    }
+
+    function setTrustedForwarder(address _trustedForwarder) public {
+        require(msg.sender == contractOwner);
+
+        _setTrustedForwarder(_trustedForwarder);
     }
 
     function CreateProfile(address _Owner) private {
@@ -63,11 +73,11 @@ contract Main {
     }
 
     function ChangePicture(string memory _MediaLink) public {
-        require(Profiles[msg.sender], "You never interact with the contract");
+        require(Profiles[_msgSender()], "You never interact with the contract");
 
-        Profile[msg.sender].Picture = _MediaLink;
+        Profile[_msgSender()].Picture = _MediaLink;
 
-        emit PictureChanged(msg.sender, _MediaLink);
+        emit PictureChanged(_msgSender(), _MediaLink);
     }
 
     function GetPicture(address _Opponent) public view returns (string memory) {
@@ -79,14 +89,14 @@ contract Main {
     }
 
     function AddBlockList(address _Opponent) public {
-        require(msg.sender != _Opponent, "Can not block own address");
-        require(Profiles[msg.sender], "You never interact with the contract");
-        require(!BlockList[msg.sender][_Opponent], "Address already blocked");
+        require(_msgSender() != _Opponent, "Can not block own address");
+        require(Profiles[_msgSender()], "You never interact with the contract");
+        require(!BlockList[_msgSender()][_Opponent], "Address already blocked");
 
-        BlockList[msg.sender][_Opponent] = true;
-        Profile[msg.sender].BlockList.push(_Opponent);
+        BlockList[_msgSender()][_Opponent] = true;
+        Profile[_msgSender()].BlockList.push(_Opponent);
 
-        emit BlockListAdded(msg.sender, _Opponent);
+        emit BlockListAdded(_msgSender(), _Opponent);
     }
 
     function ReBlockList(address _Opponent)
@@ -112,13 +122,13 @@ contract Main {
     }
 
     function RemoveBlockList(address _Opponent) public {
-        require(Profiles[msg.sender], "You never interact with the contract");
-        require(BlockList[msg.sender][_Opponent], "Address is not blocked");
+        require(Profiles[_msgSender()], "You never interact with the contract");
+        require(BlockList[_msgSender()][_Opponent], "Address is not blocked");
 
-        BlockList[msg.sender][_Opponent] = false;
-        Profile[msg.sender].BlockList = ReBlockList(_Opponent);
+        BlockList[_msgSender()][_Opponent] = false;
+        Profile[_msgSender()].BlockList = ReBlockList(_Opponent);
 
-        emit BlockListRemoved(msg.sender, _Opponent);
+        emit BlockListRemoved(_msgSender(), _Opponent);
     }
 
     function Opponents(uint256 _BeforeHeight, uint256 _Limit)
@@ -138,14 +148,17 @@ contract Main {
                 if (
                     _BeforeHeight > 0 &&
                     Messages[msg.sender][Profile[msg.sender].Opponents[i]][
-                        Messages[msg.sender][Profile[msg.sender].Opponents[i]]
-                            .length - 1
+                        Messages[msg.sender][
+                            Profile[msg.sender].Opponents[i]
+                        ].length - 1
                     ].BlockHeight <=
                     _BeforeHeight
                 ) {
                     OpponentList[OpponentListLength] = OpponentStruct(
                         Profile[msg.sender].Opponents[i],
-                        Messages[msg.sender][Profile[msg.sender].Opponents[i]][
+                        Messages[msg.sender][
+                            Profile[msg.sender].Opponents[i]
+                        ][
                             Messages[msg.sender][
                                 Profile[msg.sender].Opponents[i]
                             ].length - 1
@@ -156,7 +169,9 @@ contract Main {
                 } else if (_BeforeHeight == 0 && OpponentListLength < _Limit) {
                     OpponentList[OpponentListLength] = OpponentStruct(
                         Profile[msg.sender].Opponents[i],
-                        Messages[msg.sender][Profile[msg.sender].Opponents[i]][
+                        Messages[msg.sender][
+                            Profile[msg.sender].Opponents[i]
+                        ][
                             Messages[msg.sender][
                                 Profile[msg.sender].Opponents[i]
                             ].length - 1
@@ -232,18 +247,18 @@ contract Main {
         bytes memory _MediaLink,
         address _KeyLocation
     ) public {
-        require(msg.sender != _ToAddress, "Can not send message to yourself");
+        require(_msgSender() != _ToAddress, "Can not send message to yourself");
 
         require(bytes(_MessageText).length > 0, "Invalid message!");
 
-        if (!Profiles[msg.sender]) CreateProfile(msg.sender);
+        if (!Profiles[_msgSender()]) CreateProfile(_msgSender());
 
-        if (Messages[msg.sender][_ToAddress].length <= 0)
-            Profile[msg.sender].Opponents.push(_ToAddress);
+        if (Messages[_msgSender()][_ToAddress].length <= 0)
+            Profile[_msgSender()].Opponents.push(_ToAddress);
 
-        Messages[msg.sender][_ToAddress].push(
+        Messages[_msgSender()][_ToAddress].push(
             MessageStruct(
-                msg.sender,
+                _msgSender(),
                 _ToAddress,
                 _MessageText,
                 _MediaLink,
@@ -253,15 +268,15 @@ contract Main {
             )
         );
 
-        if (!BlockList[_ToAddress][msg.sender]) {
+        if (!BlockList[_ToAddress][_msgSender()]) {
             if (!Profiles[_ToAddress]) CreateProfile(_ToAddress);
 
-            if (Messages[_ToAddress][msg.sender].length <= 0)
-                Profile[_ToAddress].Opponents.push(msg.sender);
+            if (Messages[_ToAddress][_msgSender()].length <= 0)
+                Profile[_ToAddress].Opponents.push(_msgSender());
 
-            Messages[_ToAddress][msg.sender].push(
+            Messages[_ToAddress][_msgSender()].push(
                 MessageStruct(
-                    msg.sender,
+                    _msgSender(),
                     _ToAddress,
                     _MessageText,
                     _MediaLink,
@@ -272,6 +287,6 @@ contract Main {
             );
         }
 
-        emit Sent(msg.sender, _ToAddress);
+        emit Sent(_msgSender(), _ToAddress);
     }
 }
