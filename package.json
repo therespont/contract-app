@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "@opengsn/contracts": "^3.0.0-beta.6",
+    "@openzeppelin/contracts": "^5.0.2",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.12.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.0.5",
+    "@oasisprotocol/sapphire-hardhat": "^2.19.4",
+    "hardhat": "^2.22.2"
+  }
+}
