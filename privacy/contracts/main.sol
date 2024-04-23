@@ -39,7 +39,7 @@ contract Main is ERC2771Recipient {
         address _AddressPair,
         bytes memory _IssuerKey
     ) public returns (address[] memory) {
-        Key Deploy = new Key(_Key, _IssuerKey, msg.sender, _AddressPair);
+        Key Deploy = new Key(_Key, _IssuerKey, _msgSender(), _AddressPair);
 
         Room[_msgSender()][_AddressPair].push(address(Deploy));
         Room[_AddressPair][_msgSender()].push(address(Deploy));
